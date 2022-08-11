@@ -49,6 +49,32 @@
    Checksum - inverted 256 checksum; data bytes are sumed up and then inverted
 */
 
+
+#if defined (__AVR_ATmega328P__)
+#include <SoftwareSerial.h>
+
+#define RX1_PIN 0
+#define TX1_PIN 1
+#define MOD1_PIN 2 
+#define RX2_PIN 3
+#define TX2_PIN 4
+#define MOD2_PIN 5 
+
+#define Serial1 Serial
+SoftwareSerial Serial2(RX2_PIN, TX2_PIN);
+#elif defined (ARDUINO_ARCH_ESP32)
+#include <HardwareSerial.h>
+
+#define RX1_PIN 3
+#define TX1_PIN 1
+#define MOD1_PIN 21 
+#define RX2_PIN 16
+#define TX2_PIN 17
+#define MOD2_PIN 4
+
+#define Serial1 Serial
+#endif 
+
 // CONSTRUCTORS
 lin_stack::lin_stack(byte Ch){
 	sleep_config(Ch); // Configurating Sleep pin for transceiver
@@ -165,10 +191,18 @@ int lin_stack::writeStream(byte data[], byte data_size){
 int lin_stack::setSerial(){ // Only needed when receiving signals
 	if(ch==1){ // For LIN1 (Channel 1)
 		Serial1.begin(bound_rate); // Configure Serial1
+#ifdef ARDUINO_SAM_DUE
 		PIOA->PIO_PUER = PIO_PA10; // We need software Pull-Up because there is no hardware Pull-Up resistor
+#else
+		pinMode(RX1_PIN, INPUT_PULLUP);
+#endif
 	} else if(ch==2){ // For LIN2 (Channel 2)
 		Serial2.begin(bound_rate); // Configure Serial1
+#ifdef ARDUINO_SAM_DUE
 		PIOA->PIO_PUER = PIO_PA12; // We need software Pull-Up because there is no hardware Pull-Up resistor
+#else
+		pinMode(RX2_PIN, INPUT_PULLUP);
+#endif
 	}
 }
 
@@ -214,7 +248,10 @@ int lin_stack::readStream(byte data[],byte data_size){
 		}
 	}else if(ch==2){ // For LIN2 or Serial2
 		if(Serial2.read() != -1){ // Check if there is an event on LIN bus
-			Serial2.readBytes(data,data_size);
+			Serial2.readBytes(rec,data_size);
+			for(int j=0;j<data_size;j++){
+				data[j] = rec[j];
+			}
 			return 1;
 		}
 	}
@@ -227,6 +264,7 @@ int lin_stack::serial_pause(int no_bits){
 	// Calculate delay needed for 13 bits, depends on bound rate
 	unsigned int del = period*no_bits; // delay for number of bits (no-bits) in microseconds, depends on period
 	if(ch==2){
+#ifdef ARDUINO_SAM_DUE
 		PIOA->PIO_PER = PIO_PA13; // enable PIO register
 		PIOA->PIO_OER = PIO_PA13; // enable PA13 as output
 		PIOA->PIO_CODR = PIO_PA13; // clear PA13
@@ -234,7 +272,15 @@ int lin_stack::serial_pause(int no_bits){
 		PIOA->PIO_SODR = PIO_PA13; // set pin high
 		PIOA->PIO_ODR = PIO_PA13; // enable PA13 as output
 		PIOA->PIO_PDR = PIO_PA13; // clear configuration for PIO, needs to be done because Serial wont work with it
+#else
+		pinMode(TX2_PIN, OUTPUT);
+		digitalWrite(TX2_PIN, LOW);
+		delayMicroseconds(del); // delay
+		digitalWrite(TX2_PIN, HIGH);
+		pinMode(TX2_PIN, INPUT);
+#endif
 	}else if(ch==1){
+#ifdef ARDUINO_SAM_DUE
 		PIOA->PIO_PER = PIO_PA11; // enable PIO register
 		PIOA->PIO_OER = PIO_PA11; // enable PA11 as output
 		PIOA->PIO_CODR = PIO_PA11; // clear PA11
@@ -242,17 +288,34 @@ int lin_stack::serial_pause(int no_bits){
 		PIOA->PIO_SODR = PIO_PA11; // set pin high
 		PIOA->PIO_ODR = PIO_PA11; // enable PA13 as output
 		PIOA->PIO_PDR = PIO_PA11; // clear configuration for PIO, needs to be done because Serial wont work with it
+#else
+		pinMode(TX1_PIN, OUTPUT);
+		digitalWrite(TX1_PIN, LOW);
+		delayMicroseconds(del); // delay
+		digitalWrite(TX1_PIN, HIGH);
+		pinMode(TX1_PIN, INPUT);
+#endif
 	}
 	return 1;
 }
 
 int lin_stack::sleep(byte sleep_state){
 	if(sleep_state==1){ // Go to Normal mode
+#ifdef ARDUINO_SAM_DUE
 		if(ch==1) PIOB->PIO_SODR = PIO_PB4; // Set PB4, high state, normal mode
 		if(ch==2) PIOB->PIO_SODR = PIO_PB7; // Set PB7, high state, normal mode
+#else
+		if(ch==1) digitalWrite(MOD1_PIN, HIGH);
+		if(ch==2) digitalWrite(MOD2_PIN, HIGH);
+#endif
 	}else if(sleep_state==0){ // Go to Sleep mode
+#ifdef ARDUINO_SAM_DUE
 		if(ch==1) PIOB->PIO_CODR = PIO_PB4; // Clear PB4, low state, sleep mode
 		if(ch==2) PIOB->PIO_CODR = PIO_PB7; // Clear PB7, low state, sleep mode
+#else
+		if(ch==1) digitalWrite(MOD1_PIN, LOW);
+		if(ch==2) digitalWrite(MOD2_PIN, LOW);
+#endif
 	}
 	delayMicroseconds(20); // According to TJA1021 datasheet this is needed for proper working
 	return 1;
@@ -260,15 +323,23 @@ int lin_stack::sleep(byte sleep_state){
 
 int lin_stack::sleep_config(byte serial_No){
 	if(serial_No==1){ // When using LIN1 channel - usign Serial1 and pin PB4 for Sleep
+#ifdef ARDUINO_SAM_DUE
 		PIOB->PIO_PER = PIO_PB4; // enable PIO register on pin PB4
 		PIOB->PIO_OER = PIO_PB4; // set PB4 as output
 		PIOB->PIO_PUDR = PIO_PB4; // disable pull-up
+#else
+		pinMode(MOD1_PIN, OUTPUT);
+#endif
 		ch=1; // saved as private variable, used for determening Serial port
 	}else if(serial_No==2)
 	{ // When using LIN2 channel - usign Serial2 and pin PB7 for Sleep
+#ifdef ARDUINO_SAM_DUE
 		PIOB->PIO_PER = PIO_PB7; // enable PIO register on pin PB7
 		PIOB->PIO_OER = PIO_PB7; // set PB7 as output
 		PIOB->PIO_PUDR = PIO_PB7; // disable pull-up
+#else
+		pinMode(MOD2_PIN, OUTPUT);
+#endif
 		ch=2; // saved as private variable, used for determening Serial port
 	}
 	return 1;
@@ -298,21 +369,35 @@ int lin_stack::busWakeUp()
   unsigned int del = period*10; // random delay for dominant signal, has to be in the timeframe from 250us ... 5ms
   if(ch==2)
   {
+#ifdef ARDUINO_SAM_DUE
     PIOA->PIO_PER = PIO_PA13; // enable PIO register
     PIOA->PIO_OER = PIO_PA13; // enable PA13 as output
     PIOA->PIO_CODR = PIO_PA13; // clear PA13
     delayMicroseconds(del); // delay
     PIOA->PIO_SODR = PIO_PA13; // set pin high
     PIOA->PIO_PDR = PIO_PA13; // clear configuration for PIO, needs to be done because Serial wont work with it
+#else
+	pinMode(MOD2_PIN, OUTPUT);
+	digitalWrite(MOD2_PIN, 0);
+    delayMicroseconds(del); // delay
+	pinMode(MOD2_PIN, INPUT);
+#endif
   }
   else if(ch==1)
   {
+#ifdef ARDUINO_SAM_DUE
     PIOA->PIO_PER = PIO_PA11; // enable PIO register
     PIOA->PIO_OER = PIO_PA11; // enable PA11 as output
     PIOA->PIO_CODR = PIO_PA11; // clear PA11
     delayMicroseconds(del); // delay
     PIOA->PIO_SODR = PIO_PA11; // set pin high
     PIOA->PIO_PDR = PIO_PA11; // clear configuration for PIO, needs to be done because Serial wont work with it
+#else
+	pinMode(MOD1_PIN, OUTPUT);
+	digitalWrite(MOD1_PIN, 0);
+    delayMicroseconds(del); // delay
+	pinMode(MOD1_PIN, INPUT);
+#endif
   }
   return 1;
 }
