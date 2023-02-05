@@ -73,6 +73,8 @@ public:
     uint8_t generateIdent(const uint8_t addr) const;
     uint8_t calcIdentParity(const uint8_t ident) const;
 
+    bool validateChecksum(const void *data, size_t len); // for validating Checksum Byte
+
     static constexpr uint32_t MAX_DELAY = UINT32_MAX;
 
     // Private methods and variables
@@ -87,6 +89,5 @@ private:
     void sleep_config(); // configuration of sleep pins
     void lin_break();    // for generating Synch Break
     bool validateParity(uint8_t ident); // for validating Identification Byte, can be modified for validating parity
-    bool validateChecksum(const void *data, size_t len); // for validating Checksum Byte
     uint8_t calcChecksum(const void *data, size_t len);
 };
