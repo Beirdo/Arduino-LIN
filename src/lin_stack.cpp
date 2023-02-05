@@ -32,8 +32,10 @@
  *  RoboSap, Institute of Technology, September 2016
  */
 
+#include <Arduino.h>
 #include <lin_stack.h>
 #include <avr/sfr_defs.h>
+
 
 /* LIN PACKET:
    It consist of:
@@ -122,7 +124,10 @@ bool lin_stack::waitBreak(uint32_t maxTimeout) {
     return true;
 }
 
-int lin_stack::readStream(uint8_t *data, size_t len) { return channel.readBytes(data, len); }
+int lin_stack::readStream(uint8_t *data, size_t len)
+{
+    return channel.readBytes(data, len); 
+}
 
 // PRIVATE METHODS
 void lin_stack::lin_break() {
@@ -170,7 +175,7 @@ void lin_stack::busWakeUp() {
 }
 
 uint8_t lin_stack::generateIdent(const uint8_t addr) const {
-    return ((addr << 2) & 0x3f) | calcIdentParity(addr);
+    return (addr & 0x3f) | calcIdentParity(addr);
 }
 
 /* Create the Lin ID parity */
