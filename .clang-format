@@ -1,0 +1,16 @@
+# Format Style Options - Created with Clang Power Tools
+---
+BasedOnStyle: WebKit
+AlignAfterOpenBracket: Align
+AlignTrailingComments: true
+BreakBeforeBraces: Attach
+BreakConstructorInitializers: BeforeColon
+ColumnLimit: 110
+ConstructorInitializerAllOnOneLineOrOnePerLine: true
+Cpp11BracedListStyle: true
+DerivePointerAlignment: true
+IndentCaseLabels: true
+MaxEmptyLinesToKeep: 2
+SpaceBeforeCpp11BracedList: false
+SpaceBeforeParens: Never
+...
