@@ -48,8 +48,9 @@
    Synch Break - min 13 bits of dominant state ("0"), followed by 1 bit recesive state ("1")
    Synch Byte - Byte for Bound rate syncronization, always 0x55
    ID Byte - consist of parity, length and address; parity is determined by LIN standard and depends from
-   address and message length Data Bytes - user defined; depend on devices on LIN bus Checksum - inverted 256
-   checksum; data bytes are sumed up and then inverted
+             address and message length 
+   Data Bytes - user defined; depend on devices on LIN bus 
+   Checksum - inverted 256 checksum; data bytes are summed up and then inverted
 */
 
 // CONSTRUCTORS
@@ -125,7 +126,7 @@ bool lin_stack::read(uint8_t *data, const size_t len, size_t *read) {
         return false;
     }
 
-    return header_only || validateChecksum(buffer, *read + 3);
+    return header_only || validateChecksum(data, *read);
 }
 
 void lin_stack::setupSerial() { 
