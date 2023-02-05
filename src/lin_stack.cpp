@@ -53,10 +53,13 @@
 */
 
 // CONSTRUCTORS
-lin_stack::lin_stack(HardwareSerial &_channel, uint16_t _baud, int8_t _wake_pin, uint8_t _ident)
-    : baud(_baud), channel(_channel), ident(_ident), wake_pin(_wake_pin) {
-    if(wake_pin >= 0)
-        sleep_config(); // Configurating Sleep pin for transceiver
+lin_stack::lin_stack(HardwareSerial &_channel, uint16_t _baud, 
+                     int8_t _wake_pin, int8_t _sleep_pin, uint8_t _ident) :
+        baud(_baud), channel(_channel), ident(_ident), wake_pin(_wake_pin),
+        sleep_pin(_sleep_pin) {
+    if(wake_pin >= 0 || sleep_pin >= 0) {
+        sleep_config();
+    }
 }
 
 // PUBLIC METHODS
@@ -104,13 +107,30 @@ void lin_stack::writeStream(const void *data, size_t len) {
 
 bool lin_stack::read(uint8_t *data, const size_t len, size_t *read) {
     size_t loc;
+    int total_len = len + 3;
+    uint8_t buffer[total_len];
+
     if(read == nullptr)
         read = &loc;
-    *read = channel.readBytes(data, len);
-    return (validateParity(data[0]) && validateChecksum(data, min(len, *read)));
+    *read = channel.readBytes(buffer, total_len);
+
+    bool header_only = (*read == 2);
+    *read = max(*read - 3, 0);
+
+    for (int i = 0; i < len; i++) {
+        data[i] = buffer[i + 2];
+    }
+
+    if (!validateParity(buffer[0])) {
+        return false;
+    }
+
+    return header_only || validateChecksum(buffer, *read + 3);
 }
 
-void lin_stack::setupSerial() { channel.begin(baud); }
+void lin_stack::setupSerial() { 
+    channel.begin(baud); 
+}
 
 bool lin_stack::waitBreak(uint32_t maxTimeout) {
     const auto enterTime = millis();
@@ -140,14 +160,37 @@ void lin_stack::lin_break() {
     channel.flush();
 }
 
-void lin_stack::sleep(bool sleep_state) {
-    digitalWrite(wake_pin, (sleep_state) ? HIGH : LOW);
-    delayMicroseconds(20); // According to TJA1021 datasheet this is needed for proper working
+void lin_stack::sleep(int8_t sleep_state) {
+    const static uint8_t wake_value[3][3] = {
+	{ HIGH, LOW, HIGH },
+	{ LOW, HIGH, HIGH },
+	{ HIGH, HIGH, HIGH },
+    };
+
+    const static uint8_t sleep_value[3][3] = {
+	{ HIGH, HIGH, LOW },
+	{ HIGH, HIGH, LOW },
+	{ HIGH, HIGH, LOW },
+    };
+
+    current_sleep_state = min(max(current_sleep_state, STATE_NORMAL), STATE_SLEEP);
+    sleep_state = min(max(sleep_state, STATE_NORMAL), STATE_SLEEP);
+
+    digitalWrite(wake_pin, wake_value[current_sleep_state][sleep_state]);
+    digitalWrite(sleep_pin, sleep_value[current_sleep_state][sleep_state]);
+
+    // According to TJA1021 datasheet this is needed for proper working
+    delayMicroseconds(20); 
+
+    current_sleep_state = sleep_state;
 }
 
 void lin_stack::sleep_config() {
     pinMode(wake_pin, OUTPUT);
-    digitalWrite(wake_pin, LOW);
+    pinMode(sleep_pin, OUTPUT);
+    digitalWrite(wake_pin, HIGH);
+    digitalWrite(sleep_pin, LOW);
+    current_sleep_state = STATE_SLEEP;
 }
 
 bool lin_stack::validateParity(uint8_t _ident) { return (_ident == ident); }

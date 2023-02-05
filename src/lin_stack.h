@@ -38,13 +38,20 @@
 #include <stdint.h>
 
 /*
-        Please, read Getting Started Guide firts.
+        Please, read Getting Started Guide first.
 */
+
+enum {
+    STATE_NORMAL,
+    STATE_STANDBY,
+    STATE_SLEEP,
+};
 
 class lin_stack {
 public:
     // Constructors
-    lin_stack(HardwareSerial &_channel = Serial, uint16_t _baud = 19200, int8_t _wakeup_pin = -1,
+    lin_stack(HardwareSerial &_channel = Serial, uint16_t _baud = 19200, 
+              int8_t _wakeup_pin = -1, int8_t _sleep_pin = -1,
               uint8_t _ident = 0); // Constructor for Master and Slave Node
 
     // Methods
@@ -57,7 +64,7 @@ public:
     bool read(uint8_t *data, const size_t len,
               size_t *read);                      // read data from LIN bus, checksum and ident validation
     void busWakeUp();                             // send wakeup frame for waking up all bus participants
-    void sleep(bool sleep_state); // method for controlling transceiver modes (false - sleep, true - normal)
+    void sleep(int8_t sleep_state); // method for controlling transceiver modes (0 - sleep, 1 - standby, 2 - normal)
 
     void setupSerial();  // set up Serial communication for receiving data.
     bool waitBreak(uint32_t maxTimeout);
@@ -74,6 +81,8 @@ private:
     HardwareSerial &channel; // which channel should be used
     uint8_t ident;           // user defined Identification Byte
     int8_t wake_pin;
+    int8_t sleep_pin;
+    int8_t current_sleep_state;
 
     void sleep_config(); // configuration of sleep pins
     void lin_break();    // for generating Synch Break
