@@ -31,15 +31,18 @@
  *
  *  Arduino IDE 1.6.9
  *  RoboSap, Institute of Technology, September 2016
+ *
+ * Changes in 3.0 are Copyright (c) 2023 Gavin Hurlbut
+ *  - reworked for better slave use
+ *  - reworked sleep/wake modes
+ *  - refactored/renamed class
+ *  - added support for AVR (particularly in break detection)
+ *  - made available via the Arduino Library Manager
  */
 
 #include <Arduino.h>
 #include <HardwareSerial.h>
 #include <stdint.h>
-
-/*
-        Please, read Getting Started Guide first.
-*/
 
 enum {
     STATE_NORMAL,
@@ -47,47 +50,76 @@ enum {
     STATE_SLEEP,
 };
 
-class lin_stack {
+class LINBus_stack {
 public:
     // Constructors
-    lin_stack(HardwareSerial &_channel = Serial, uint16_t _baud = 19200, 
-              int8_t _wakeup_pin = -1, int8_t _sleep_pin = -1,
-              uint8_t _ident = 0); // Constructor for Master and Slave Node
+    LINBus_stack(HardwareSerial &_channel = Serial, uint16_t _baud = 19200,
+                 int8_t _wakeup_pin = -1, int8_t _sleep_pin = -1,
+                 uint8_t _ident = 0); // Constructor for Master and Slave Node
 
     // Methods
 
-    // Writing data to bus
-    void write(const uint8_t ident, const void *data, size_t len); // write whole package
-    void writeRequest(const uint8_t ident);                        // Write header only
-    void writeResponse(const void *data, size_t len);              // Write response only
-    void writeStream(const void *data, size_t len);                // Writing user data to LIN bus
-    bool read(uint8_t *data, const size_t len,
-              size_t *read);                      // read data from LIN bus, checksum and ident validation
-    void busWakeUp();                             // send wakeup frame for waking up all bus participants
-    void sleep(int8_t sleep_state); // method for controlling transceiver modes (0 - sleep, 1 - standby, 2 - normal)
+    // write whole package
+    void write(const uint8_t ident, const void *data, size_t len);
 
-    void setupSerial();  // set up Serial communication for receiving data.
+    // Write header only (used to request data from a slave)
+    void writeRequest(const uint8_t ident);
+
+    // Write response only (used by a slave to respond to a request)
+    void writeResponse(const void *data, size_t len);
+
+    // Writing user data to LIN bus as is.
+    void writeStream(const void *data, size_t len);
+
+    // read data from LIN bus, checksum and ident validation (no checksum check if only header received)
+    bool read(uint8_t *data, const size_t len, size_t *read);
+
+    // send wakeup frame for waking up all bus participants
+    void busWakeUp(void);
+
+    // method for controlling transceiver modes (0 - sleep, 1 - standby, 2 - normal)
+    void sleep(int8_t sleep_state);
+
+    // set up Serial communication for receiving data.
+    void setupSerial(void);
+
     bool waitBreak(uint32_t maxTimeout);
-    int readStream(uint8_t *data, size_t len); // read data from LIN bus
+
+    // read data from LIN bus as is.
+    int readStream(uint8_t *data, size_t len);
 
     uint8_t generateIdent(const uint8_t addr) const;
+
     uint8_t calcIdentParity(const uint8_t ident) const;
 
-    bool validateChecksum(const void *data, size_t len); // for validating Checksum Byte
+    // for validating Checksum Byte
+    bool validateChecksum(const void *data, size_t len);
 
     static constexpr uint32_t MAX_DELAY = UINT32_MAX;
 
-    // Private methods and variables
 private:
-    const uint16_t baud;     // 10417 is best for LIN Interface, most device should work
-    HardwareSerial &channel; // which channel should be used
-    uint8_t ident;           // user defined Identification Byte
+    // 10417 is best for LIN Interface, most device should work
+    const uint16_t baud;
+
+    // which channel should be used
+    HardwareSerial &channel;
+
+    // user defined Identification Byte
+    uint8_t ident;
+
     int8_t wake_pin;
     int8_t sleep_pin;
     int8_t current_sleep_state;
 
-    void sleep_config(); // configuration of sleep pins
-    void lin_break();    // for generating Synch Break
-    bool validateParity(uint8_t ident); // for validating Identification Byte, can be modified for validating parity
+    // configuration of sleep pins
+    void sleep_config(void);
+
+
+    // for generating Synch Break
+    void lin_break(void);
+
+    // for validating Identification Byte, can be modified for validating parity
+    bool validateParity(uint8_t ident);
+
     uint8_t calcChecksum(const void *data, size_t len);
 };
