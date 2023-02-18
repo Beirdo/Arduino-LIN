@@ -53,9 +53,19 @@ enum {
 class LINBus_stack {
 public:
     // Constructors
-    LINBus_stack(HardwareSerial &_channel = Serial, uint16_t _baud = 19200,
-                 int8_t _wakeup_pin = -1, int8_t _sleep_pin = -1,
-                 uint8_t _ident = 0); // Constructor for Master and Slave Node
+    LINBus_stack(HardwareSerial &_channel = Serial, uint16_t _baud = 19200);
+    void setPinMode(void (*pinModeFunc_)(uint8_t, uint8_t))
+    {
+      pinModeFunc = pinModeFunc_;
+    };
+
+    void setDigitalWrite(void (*digitalWriteFunc_)(uint8_t, uint8_t))
+    {
+      digitalWriteFunc = digitalWriteFunc_;
+    };
+
+    void begin(int8_t _wakeup_pin = -1, int8_t _sleep_pin = -1,
+               uint8_t _ident = 0); // Constructor for Master and Slave Node
 
     // Methods
 
@@ -111,9 +121,14 @@ private:
     int8_t sleep_pin;
     int8_t current_sleep_state;
 
+    void (*pinModeFunc)(uint8_t, uint8_t);
+    void (*digitalWriteFunc)(uint8_t, uint8_t);
+
     // configuration of sleep pins
     void sleep_config(void);
 
+    // is break detected?
+    bool breakDetected(void);
 
     // for generating Synch Break
     void lin_break(void);

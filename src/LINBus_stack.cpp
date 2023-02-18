@@ -61,13 +61,22 @@
 */
 
 // CONSTRUCTORS
-LINBus_stack::LINBus_stack(HardwareSerial &_channel, uint16_t _baud,
-                     int8_t _wake_pin, int8_t _sleep_pin, uint8_t _ident) :
-        baud(_baud), channel(_channel), ident(_ident), wake_pin(_wake_pin),
-        sleep_pin(_sleep_pin) {
-    if(wake_pin >= 0 || sleep_pin >= 0) {
-        sleep_config();
-    }
+LINBus_stack::LINBus_stack(HardwareSerial &_channel, uint16_t _baud) :
+  baud(_baud), channel(_channel)
+{
+  setPinMode(pinMode);
+  setDigitalWrite(digitalWrite);
+}
+
+void LINBus_stack::begin(int8_t _wake_pin, int8_t _sleep_pin, uint8_t _ident)
+{
+  ident = _ident;
+  wake_pin = _wake_pin;
+  sleep_pin = _sleep_pin;
+
+  if(wake_pin >= 0 || sleep_pin >= 0) {
+    sleep_config();
+  }
 }
 
 // PUBLIC METHODS
@@ -113,19 +122,19 @@ void LINBus_stack::writeStream(const void *data, size_t len) {
     channel.flush();
 }
 
-bool LINBus_stack::read(uint8_t *data, const size_t len, size_t *read) {
+bool LINBus_stack::read(uint8_t *data, const size_t len, size_t *read_) {
     size_t loc;
     int total_len = len + 3;
     uint8_t buffer[total_len];
 
-    if(read == nullptr)
-        read = &loc;
-    *read = channel.readBytes(buffer, total_len);
+    if(!read_)
+        read_ = &loc;
+    *read_ = channel.readBytes(buffer, total_len);
 
-    bool header_only = (*read == 2);
-    *read = max(*read - 3, 0);
+    bool header_only = (*read_ == 2);
+    *read_ = (size_t)max((int)(*read_ - 3), 0);
 
-    for (int i = 0; i < len; i++) {
+    for (int i = 0; i < (int)len; i++) {
         data[i] = buffer[i + 2];
     }
 
@@ -133,16 +142,24 @@ bool LINBus_stack::read(uint8_t *data, const size_t len, size_t *read) {
         return false;
     }
 
-    return header_only || validateChecksum(data, *read);
+    return header_only || validateChecksum(data, *read_);
 }
 
 void LINBus_stack::setupSerial(void) {
     channel.begin(baud);
 }
 
+bool LINBus_stack::breakDetected(void) {
+#ifdef __AVR_ATtinyxy4__
+  return bit_is_set(USART0.STATUS, USART_BDF_bm);
+#else
+  return bit_is_set(UCSR0A, FE0);
+#endif
+}
+
 bool LINBus_stack::waitBreak(uint32_t maxTimeout) {
     const auto enterTime = millis();
-    while(bit_is_clear(UCSR0A, FE0)) {
+    while(!breakDetected()) {
         const auto now = millis();
         if(maxTimeout < UINT32_MAX &&  now - enterTime > maxTimeout) {
             // we timed out
@@ -184,8 +201,8 @@ void LINBus_stack::sleep(int8_t sleep_state) {
     current_sleep_state = min(max(current_sleep_state, STATE_NORMAL), STATE_SLEEP);
     sleep_state = min(max(sleep_state, STATE_NORMAL), STATE_SLEEP);
 
-    digitalWrite(wake_pin, wake_value[current_sleep_state][sleep_state]);
-    digitalWrite(sleep_pin, sleep_value[current_sleep_state][sleep_state]);
+    digitalWriteFunc(wake_pin, wake_value[current_sleep_state][sleep_state]);
+    digitalWriteFunc(sleep_pin, sleep_value[current_sleep_state][sleep_state]);
 
     // According to TJA1021 datasheet this is needed for proper working
     delayMicroseconds(20);
@@ -194,10 +211,10 @@ void LINBus_stack::sleep(int8_t sleep_state) {
 }
 
 void LINBus_stack::sleep_config(void) {
-    pinMode(wake_pin, OUTPUT);
-    pinMode(sleep_pin, OUTPUT);
-    digitalWrite(wake_pin, HIGH);
-    digitalWrite(sleep_pin, LOW);
+    pinModeFunc(wake_pin, OUTPUT);
+    pinModeFunc(sleep_pin, OUTPUT);
+    digitalWriteFunc(wake_pin, HIGH);
+    digitalWriteFunc(sleep_pin, LOW);
     current_sleep_state = STATE_SLEEP;
 }
 
