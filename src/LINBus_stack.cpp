@@ -89,7 +89,7 @@ void LINBus_stack::write(const uint8_t ident, const void *data, size_t len) {
     channel.begin(baud);
     channel.write(0x55);
     channel.write(ident);
-    channel.write(static_cast<const char *>(data), len);
+    channel.write((const char *)(data), len);
     channel.write(calcChecksum(data, len));
     channel.flush();
 }
@@ -106,7 +106,7 @@ void LINBus_stack::writeRequest(const uint8_t ident) {
 
 void LINBus_stack::writeResponse(const void *data, size_t len) {
     channel.begin(baud);
-    channel.write(static_cast<const char *>(data), len);
+    channel.write((const char *)(data), len);
     channel.write(calcChecksum(data, len));
     channel.flush();
 }
@@ -124,8 +124,8 @@ void LINBus_stack::writeStream(const void *data, size_t len) {
 
 bool LINBus_stack::read(uint8_t *data, const size_t len, size_t *read_) {
     size_t loc;
-    int total_len = len + 3;
-    uint8_t buffer[total_len];
+    int total_len = min((int)len + 3, 15);
+    uint8_t buffer[15];
 
     if(!read_)
         read_ = &loc;
