@@ -81,7 +81,7 @@ void LINBus_stack::begin(int8_t _wake_pin, int8_t _sleep_pin, uint8_t _ident)
 
 // PUBLIC METHODS
 // WRITE methods
-// Creates a LIN packet and then send it via USART(Serial) interface.
+// Creates a LIN packet and then send it via USART(Serial) interface. (master-side write)
 void LINBus_stack::write(const uint8_t ident, const void *data, size_t len) {
     // Synch Break
     lin_break();
@@ -94,6 +94,7 @@ void LINBus_stack::write(const uint8_t ident, const void *data, size_t len) {
     channel.flush();
 }
 
+// Setup a master-side read.
 void LINBus_stack::writeRequest(const uint8_t ident) {
     // Synch Break
     lin_break();
@@ -104,6 +105,7 @@ void LINBus_stack::writeRequest(const uint8_t ident) {
     channel.flush();
 }
 
+// Send the slave-side response to a master-side read
 void LINBus_stack::writeResponse(const void *data, size_t len) {
     channel.begin(baud);
     channel.write((const char *)(data), len);
@@ -118,31 +120,43 @@ void LINBus_stack::writeStream(const void *data, size_t len) {
     channel.begin(baud);
     channel.write(0x55);
     channel.write(ident);
-    channel.write(static_cast<const char *>(data), len);
+    channel.write((const char *)(data), len);
     channel.flush();
 }
 
+// slave-side receive from master
 bool LINBus_stack::read(uint8_t *data, const size_t len, size_t *read_) {
     size_t loc;
-    int total_len = min((int)len + 3, 15);
-    uint8_t buffer[15];
+    uint8_t header[2];
+    bool retval;
 
     if(!read_)
         read_ = &loc;
-    *read_ = channel.readBytes(buffer, total_len);
+    *read_ = channel.readBytes(header, 2);
 
-    bool header_only = (*read_ == 2);
-    *read_ = (size_t)max((int)(*read_ - 3), 0);
-
-    for (int i = 0; i < (int)len; i++) {
-        data[i] = buffer[i + 2];
+    if (*read_ != 2) {
+      retval = false;
+    } else if (header[0] != 0x55) {
+      retval = false;
+    } else if (!validateParity(header[1])) {
+      retval = false;
     }
 
-    if (!validateParity(buffer[0])) {
-        return false;
+    if (!retval) {
+      channel.flush();
+      return false;
     }
 
-    return header_only || validateChecksum(data, *read_);
+    if (!channel.available()) {
+      // Header only.  This is a read
+      *read_ = 0;
+      return true;
+    }
+
+    // This was a write
+    *read_ = channel.readBytes(data, len);
+    channel.flush();
+    return validateChecksum(data, *read_);
 }
 
 void LINBus_stack::setupSerial(void) {
