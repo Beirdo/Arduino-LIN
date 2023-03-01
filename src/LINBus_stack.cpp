@@ -41,7 +41,7 @@
 
 #include <Arduino.h>
 #include <LINBus_stack.h>
-#include <avr/sfr_defs.h>
+// #include <avr/sfr_defs.h>
 
 
 /* LIN PACKET:

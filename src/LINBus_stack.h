@@ -40,6 +40,9 @@
  *  - made available via the Arduino Library Manager
  */
 
+#ifndef __LINBus_stack_h_
+#define __LINBus_stack_h_
+
 #include <Arduino.h>
 #include <HardwareSerial.h>
 #include <stdint.h>
@@ -138,3 +141,5 @@ private:
 
     uint8_t calcChecksum(const void *data, size_t len);
 };
+
+#endif
