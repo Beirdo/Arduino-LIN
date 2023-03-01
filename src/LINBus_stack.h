@@ -47,16 +47,23 @@
 #include <HardwareSerial.h>
 #include <stdint.h>
 
-enum {
+typedef enum {
     STATE_NORMAL,
     STATE_STANDBY,
     STATE_SLEEP,
-};
+} linbus_state_t;
+
+#ifndef OWERRIDE_GPIO_FUNCS
+#define pinModeFunc pinMode
+#define digitalWriteFunc digitalWrite
+#endif
 
 class LINBus_stack {
 public:
     // Constructors
     LINBus_stack(HardwareSerial &_channel = Serial, uint16_t _baud = 19200);
+
+#ifdef OVERRIDE_GPIO_FUNCS
     void setPinMode(void (*pinModeFunc_)(uint8_t, uint8_t))
     {
       pinModeFunc = pinModeFunc_;
@@ -66,6 +73,7 @@ public:
     {
       digitalWriteFunc = digitalWriteFunc_;
     };
+#endif
 
     void begin(int8_t _wakeup_pin = -1, int8_t _sleep_pin = -1,
                uint8_t _ident = 0); // Constructor for Master and Slave Node
@@ -91,7 +99,7 @@ public:
     void busWakeUp(void);
 
     // method for controlling transceiver modes (0 - sleep, 1 - standby, 2 - normal)
-    void sleep(int8_t sleep_state);
+    void sleep(linbus_state_t sleep_state);
 
     // set up Serial communication for receiving data.
     void setupSerial(void);
@@ -122,10 +130,12 @@ private:
 
     int8_t wake_pin;
     int8_t sleep_pin;
-    int8_t current_sleep_state;
+    linbus_state_t current_sleep_state;
 
+#ifdef OVERRIDE_GPIO_FUNCS
     void (*pinModeFunc)(uint8_t, uint8_t);
     void (*digitalWriteFunc)(uint8_t, uint8_t);
+#endif
 
     // configuration of sleep pins
     void sleep_config(void);

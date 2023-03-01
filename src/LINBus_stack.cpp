@@ -41,7 +41,9 @@
 
 #include <Arduino.h>
 #include <LINBus_stack.h>
-// #include <avr/sfr_defs.h>
+#ifndef STM32F0xx
+#include <avr/sfr_defs.h>
+#endif
 
 
 /* LIN PACKET:
@@ -64,8 +66,10 @@
 LINBus_stack::LINBus_stack(HardwareSerial &_channel, uint16_t _baud) :
   baud(_baud), channel(_channel)
 {
+#ifdef OVERRIDE_GPIO_FUNCS
   setPinMode(pinMode);
   setDigitalWrite(digitalWrite);
+#endif
 }
 
 void LINBus_stack::begin(int8_t _wake_pin, int8_t _sleep_pin, uint8_t _ident)
@@ -167,7 +171,11 @@ bool LINBus_stack::breakDetected(void) {
 #ifdef __AVR_ATtinyxy4__
   return bit_is_set(USART0.STATUS, USART_BDF_bm);
 #else
+ #ifdef STM32F0xx
+  return false;
+ #else
   return bit_is_set(UCSR0A, FE0);
+ #endif
 #endif
 }
 
@@ -199,7 +207,7 @@ void LINBus_stack::lin_break(void) {
     channel.flush();
 }
 
-void LINBus_stack::sleep(int8_t sleep_state) {
+void LINBus_stack::sleep(linbus_state_t sleep_state) {
     const static uint8_t wake_value[3][3] = {
         { HIGH, LOW, HIGH },
         { LOW, HIGH, HIGH },
