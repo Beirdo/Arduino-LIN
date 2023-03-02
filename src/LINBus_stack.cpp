@@ -171,10 +171,15 @@ bool LINBus_stack::breakDetected(void) {
 #ifdef __AVR_ATtinyxy4__
   return bit_is_set(USART0.STATUS, USART_BDF_bm);
 #else
- #ifdef STM32F0xx
-  return false;
+ #ifdef ARDUINO_ARCH_RP2040
+  return channel.getBreakReceived();
  #else
+  #ifdef STM32F0xx
+  // bit FE in USART_ISR - just return true for now
+  return true;
+  #else
   return bit_is_set(UCSR0A, FE0);
+  #endif
  #endif
 #endif
 }
