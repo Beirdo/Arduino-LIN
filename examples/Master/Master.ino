@@ -12,10 +12,10 @@
  */
 
 // Include LIN Stack library
-#include <lin_stack.h>
+#include <LINBus_stack.h>
 
-lin_stack LIN2(2); // Creating LIN Stack objects, 2 - second channel
-//lin_stack LIN1(1); // Creating LIN Stack objects, 1 - first channel
+LINBus_stack LIN2(Serial, 19200); // Creating LIN Stack objects, 2 - second channel
+//LINBus_stack LIN1(Serial, 19200); // Creating LIN Stack objects, 1 - first channel
 
 void setup() {
   // Nothing to do here.
